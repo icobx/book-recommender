@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Book Recommender</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2em;
+      }
+      input,
+      button {
+        padding: 0.5em;
+        margin-right: 0.5em;
+      }
+    </style>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.9/dist/css/autoComplete.02.min.css"
+    />
+  </head>
+  <body>
+    <h1>Book Recommender</h1>
+    <input type="number" id="topN" value="5" min="1" />
+    <input type="text" id="bookTitle" placeholder="Enter a book title" />
+    <button onclick="recommend()">Recommend</button>
+
+    <h2>Results:</h2>
+    <ul id="results"></ul>
+    <!-- <script src="https://cdn.jsdelivr.net/gh/TarekRaafat/autoComplete.js@1.2.0/dist/js/autoComplete.min.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.9/dist/autoComplete.min.js"></script>
+    <script>
+      async function recommend() {
+        const bookTitle = document.getElementById("bookTitle").value;
+        const topN = document.getElementById("topN").value;
+
+        const response = await fetch("http://localhost:8000/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book_title: bookTitle,
+            top_n: parseInt(topN),
+          }),
+        });
+        console.log(response);
+        if (!response.ok) {
+          console.log("LOLOLOLO");
+          // Response has status code >= 400
+          const error = await response.json(); // or text() if not JSON
+          console.error("Server error:", error);
+          alert(`Error: ${error.detail || "Unknown error"}`);
+          return;
+        }
+        const data = await response.json();
+        const resultsList = document.getElementById("results");
+        resultsList.innerHTML = "";
+
+        data.recommended_books.forEach((book) => {
+          const li = document.createElement("li");
+          li.textContent = `${
+            book.book_title
+          } (corr: ${book.correlation_with_selected_book.toFixed(2)}, rating: ${
+            book.average_rating
+          })`;
+          resultsList.appendChild(li);
+        });
+      }
+
+      async function loadTitles() {
+        const resp = await fetch("http://localhost:8000/search_titles");
+        const titles = await resp.json();
+
+        new autoComplete({
+          selector: "#bookTitle",
+          data: {
+            src: titles,
+            cache: true,
+          },
+          searchEngine: "strict",
+          threshold: 3, // start after 2 characters
+          maxResults: 10,
+          highlight: true,
+          onSelection: (feedback) => {
+            const selection = feedback.selection.value;
+            // `feedback.selection.value` is the selected book title
+            document.querySelector("#bookTitle").value = selection;
+          },
+        });
+      }
+      window.addEventListener("DOMContentLoaded", async () => {
+        loadTitles();
+      });
+    </script>
+  </body>
+</html>

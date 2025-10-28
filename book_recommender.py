@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 
 from utils import clean_text, download_from_kaggle, to_snake_case
-
+import models
 
 full_name = "The Fellowship of the Ring (The Lord of the Rings, Part 1)"
 
@@ -32,26 +32,31 @@ class BookRecommender:
             dtype={c: "string" for c in self.STRING_COLS}
         )
 
-    def __call__(self, book_title: str, top_n: int = 10) -> dict[str, any]:
-        corrs = self.calcualte_correlations(book_title=book_title)
+    def __call__(self, request: models.RecommendRequestBody) -> dict[str, any]:
+        corrs = self.calcualte_correlations(book_title=request.book_title)
+        top_n = request.top_n if request.top_n > 0 else len(corrs)
 
-        top_n = top_n if top_n > 0 else len(corrs)
+
+        corrs = corrs[:top_n]
 
         return {
-            'recommended_for_book': book_title,
+            'book_title': request.book_title,
             'top_n': top_n,
-            'recommended_books': corrs[:top_n]
+            'recommended_books': [models.RecommendResponseRecord(**r) for r in corrs[:top_n]]
         }
 
 
 
 
-    def calcualte_correlations(self, book_title: str) -> list[list[str, float, float]]:
+    def calcualte_correlations(self, book_title: str) -> list[dict[str, str | float]]:
         
         book_readers = self.data.loc[
             self.data.book_title_lc == (book_title_lc := book_title.lower()),
             "user_id"
         ].unique()
+
+        if len(book_readers) == 0:
+            raise ValueError(f'Book {book_title} is not in the database.')
 
         other_books_of_book_readers = self.data.loc[self.data.user_id.isin(book_readers)]
 
@@ -71,7 +76,7 @@ class BookRecommender:
 
         ratings_of_book_readers = other_books_of_book_readers.loc[
             other_books_of_book_readers.book_title_lc.isin(books_to_compare),
-            ["user_id", "book_rating", "book_title_lc"],
+            ["user_id", "book_rating", "book_title_lc", "book_title"],
         ]
 
         ratings_of_book_readers_nodup = (
@@ -90,14 +95,18 @@ class BookRecommender:
             if bt == book_title_lc:
                 continue
 
-            curr_corr = df_corr[book_title_lc].corr(df_corr[bt])
-            mean_rating = ratings_of_book_readers.loc[
-                ratings_of_book_readers.book_title_lc == bt, "book_rating"
-            ].mean()
+            correlation = df_corr[book_title_lc].corr(df_corr[bt])
+            curr_book_subset = ratings_of_book_readers.loc[ratings_of_book_readers.book_title_lc == bt]
 
-            correlations.append([bt, curr_corr, mean_rating])
+            correlations.append(
+                {
+                    'book_title': curr_book_subset.book_title.values[0],
+                    'correlation_with_selected_book': correlation,
+                    'average_rating': curr_book_subset.book_rating.mean()
+                }
+            )
 
-        return sorted(correlations, reverse=True, key=lambda x: x[1])
+        return sorted(correlations, key=lambda x: x['correlation_with_selected_book'], reverse=True)
 
     def preprocess(self):
         kaggle_path = download_from_kaggle(self.KAGGLE_HANDLE)
@@ -128,6 +137,6 @@ class BookRecommender:
 
 
     
-x = BookRecommender()
+# x = BookRecommender()
 
-print(x(book_title=full_name, top_n=2))
+# print(x(book_title=full_name, top_n=2))
