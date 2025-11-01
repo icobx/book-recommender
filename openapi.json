@@ -1,0 +1,192 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Book Recommender API",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Home",
+        "description": "Returns the HTML homepage of the app.\n\nLoads and returns the static HTML content from `static/index.html`.\n\nReturns:\n    HTML content of the homepage.",
+        "operationId": "home__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recommend": {
+      "post": {
+        "summary": "Recommend",
+        "description": "API endpoint to get book recommendations.\n\nUses the initialized `BookRecommender` to generate recommendations\nbased on the given input book title and number of recommendations.\n\nArgs:\n    request: FastAPI request object, used to access app state.\n    request_body: The request payload\n        containing `book_title` and `top_n`.\n\nReturns:\n    Recommendation results.\n\nRaises:\n    HTTPException: If an error occurs during recommendation computation.",
+        "operationId": "recommend_recommend_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendResponseBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search_titles": {
+      "get": {
+        "summary": "Search Titles",
+        "operationId": "search_titles_search_titles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "RecommendRequestBody": {
+        "properties": {
+          "book_title": {
+            "type": "string",
+            "title": "Book Title"
+          },
+          "top_n": {
+            "type": "integer",
+            "title": "Top N"
+          }
+        },
+        "type": "object",
+        "required": ["book_title", "top_n"],
+        "title": "RecommendRequestBody",
+        "description": "Request schema for book recommendation queries.\n\nAttributes:\n    book_title: Title of the book to base the recommendations on.\n    top_n: Number of top recommendations to return."
+      },
+      "RecommendResponseBody": {
+        "properties": {
+          "book_title": {
+            "type": "string",
+            "title": "Book Title"
+          },
+          "top_n": {
+            "type": "integer",
+            "title": "Top N"
+          },
+          "recommended_books": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendResponseRecord"
+            },
+            "type": "array",
+            "title": "Recommended Books"
+          }
+        },
+        "type": "object",
+        "required": ["book_title", "top_n", "recommended_books"],
+        "title": "RecommendResponseBody",
+        "description": "Response schema containing book recommendations.\n\nAttributes:\n    book_title: Title of the input book.\n    top_n: Number of recommendations returned.\n    recommended_books: List of recommended books with scores and metadata."
+      },
+      "RecommendResponseRecord": {
+        "properties": {
+          "book_title": {
+            "type": "string",
+            "title": "Book Title"
+          },
+          "correlation_with_selected_book": {
+            "type": "number",
+            "title": "Correlation With Selected Book"
+          },
+          "average_rating": {
+            "type": "number",
+            "title": "Average Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "book_title",
+          "correlation_with_selected_book",
+          "average_rating"
+        ],
+        "title": "RecommendResponseRecord",
+        "description": "Single book recommendation entry.\n\nAttributes:\n    book_title: Title of the recommended book.\n    correlation_with_selected_book: Correlation score with the input book.\n    average_rating: Average user rating of the recommended book."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # import
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # load ratings
 ratings = pd.read_csv("data/old/BX-Book-Ratings.csv", encoding="cp1251", sep=";")
