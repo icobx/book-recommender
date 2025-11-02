@@ -1,7 +1,8 @@
 import traceback
 
-from fastapi import FastAPI, HTTPException, Request, responses, staticfiles
+from fastapi import FastAPI, HTTPException, Request, Query, responses, staticfiles
 from fastapi.middleware.cors import CORSMiddleware
+from rapidfuzz import process
 
 import src.models as models
 from src.book_recommender import BookRecommender
@@ -89,10 +90,32 @@ async def recommend(
             },
         )
 
+@app.get('/autocomplete', response_model=dict)
+def autocomplete(
+    request: Request,
+    q: str = Query(..., min_length=3, description='Partial book title.'),
+    limit: int = Query(10, ge=1, le=50, description='Max number of suggestions.')
+) -> dict:
+    """API endpoint to get book titles suggestions based on provided query.
 
-@app.get("/search_titles")
-def search_titles(request: Request):
-    data = request.app.state.book_recommender.data
-    # return data[data["book_title"].str.contains(q, case=False)]["book_title"].unique().tolist()
-    # return data.loc[data.book_title.str.contains(q, case=False), 'book_title'].unique().tolist()
-    return data.book_title.unique().tolist()
+    Args:
+        request: FastAPI request object, used to access app state.
+        q: Query for suggestions. Defaults to Query(..., min_length=3, description='Partial book title.').
+        limit: Number of returned suggestions.
+            Defaults to Query(10, ge=1, le=50, description='Max number of suggestions.').
+
+    Returns:
+        Dictionary with list of suggestions under `suggestions` key.
+    """
+    # matches = process.extract(
+    #     q,
+    #     request.app.state.book_recommender.book_titles,
+    #     limit=limit
+    # )
+
+    # return {"suggestions": [title for title, _, _ in matches]}
+
+    titles = request.app.state.book_recommender.data[['book_title', 'book_title_lc']]
+    matches = titles.loc[titles.book_title_lc.str.contains(q.lower()), 'book_title'].unique().tolist()
+
+    return {"suggestions": matches}

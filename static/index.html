@@ -14,22 +14,48 @@
         margin-right: 0.5em;
       }
     </style>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.9/dist/css/autoComplete.02.min.css"
-    />
   </head>
   <body>
     <h1>Book Recommender</h1>
     <input type="number" id="topN" value="5" min="1" />
-    <input type="text" id="bookTitle" placeholder="Enter a book title" />
+
+    <!-- <label for="book">Book title:</label> -->
+    <input
+      list="book-options"
+      id="bookTitle"
+      name="book"
+      oninput="fetchSuggestions(this.value)"
+    />
+    <datalist id="book-options"></datalist>
+
+    <!-- <input type="text" id="bookTitle" placeholder="Enter a book title" /> -->
     <button onclick="recommend()">Recommend</button>
 
     <h2>Results:</h2>
     <ul id="results"></ul>
-    <!-- <script src="https://cdn.jsdelivr.net/gh/TarekRaafat/autoComplete.js@1.2.0/dist/js/autoComplete.min.js"></script> -->
-    <script src="https://cdn.jsdelivr.net/npm/@tarekraafat/autocomplete.js@10.2.9/dist/autoComplete.min.js"></script>
     <script>
+      const fetchSuggestions = async (query) => {
+        if (query.length < 3) return;
+
+        const dataList = document.getElementById("book-options");
+
+        try {
+          const response = await fetch(
+            `http://localhost:8000/autocomplete?q=${encodeURIComponent(query)}`
+          );
+          const data = await response.json();
+
+          dataList.innerHTML = "";
+          data.suggestions.forEach((title) => {
+            const option = document.createElement("option");
+            option.value = title;
+            dataList.appendChild(option);
+          });
+        } catch (error) {
+          console.log("Fetch failed: ", error);
+        }
+      };
+
       async function recommend() {
         const bookTitle = document.getElementById("bookTitle").value;
         const topN = document.getElementById("topN").value;
@@ -65,31 +91,6 @@
           resultsList.appendChild(li);
         });
       }
-
-      async function loadTitles() {
-        const resp = await fetch("http://localhost:8000/search_titles");
-        const titles = await resp.json();
-
-        new autoComplete({
-          selector: "#bookTitle",
-          data: {
-            src: titles,
-            cache: true,
-          },
-          searchEngine: "strict",
-          threshold: 3, // start after 2 characters
-          maxResults: 10,
-          highlight: true,
-          onSelection: (feedback) => {
-            const selection = feedback.selection.value;
-            // `feedback.selection.value` is the selected book title
-            document.querySelector("#bookTitle").value = selection;
-          },
-        });
-      }
-      window.addEventListener("DOMContentLoaded", async () => {
-        loadTitles();
-      });
     </script>
   </body>
 </html>

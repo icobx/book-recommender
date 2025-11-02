@@ -51,6 +51,7 @@ class BookRecommender:
             na_values=["nan"],
             dtype={c: "string" for c in self.STRING_COLS},
         )
+        self.book_titles = self.data.book_title.unique().tolist()
 
     def __call__(self, request: models.RecommendRequestBody) -> dict[str, any]:
         """Returns book recommendations based on a given book title.
