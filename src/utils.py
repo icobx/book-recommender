@@ -2,9 +2,14 @@ import html
 import re
 from pathlib import Path
 
+import pandas as pd
 import ftfy
 import kagglehub
 
+from config import Config
+
+
+cfg = Config()
 
 def to_snake_case(text: str) -> str:
     """Convert a string to snake_case.
@@ -45,3 +50,54 @@ def download_from_kaggle(handle: str) -> Path:
         Path to the downloaded datset.
     """
     return Path(kagglehub.dataset_download(handle))
+
+
+def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
+    """Downloads and preprocesses the book dataset from Kaggle.
+
+    1. Downloads the dataset if not already present.
+    2. Cleans text columns (trims, lowercases, removes noise).
+    3. Filters ratings > 0.
+    4. Merges books and ratings into a single CSV file (`merged.csv`).
+    """
+    if kaggle_path is None:
+        kaggle_path = download_from_kaggle(cfg.kaggle_handle)
+
+    books = pd.read_csv(
+        kaggle_path / "Books.csv", sep=",", on_bad_lines="warn", encoding="cp1251"
+    )
+    books.columns = map(to_snake_case, books.columns)
+    books["year_of_publication"] = (
+        pd.to_numeric(books["year_of_publication"], errors="coerce")
+        .astype("Int64")
+        .replace([0], pd.NA)
+    )
+    for c in cfg.string_cols[: cfg.non_lc_bound]:
+        books[c] = books[c].astype("string").str.strip()
+        books[c] = books[c].map(clean_text)
+    
+    books["book_title_lc"] = books["book_title"].str.lower()
+
+    return books, kaggle_path
+    # books.to_csv(cfg.data_dir / "books.csv", index=False, na_rep="nan")
+
+def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
+    if kaggle_path is None:
+        kaggle_path = download_from_kaggle(cfg.kaggle_handle)
+
+    ratings = pd.read_csv(kaggle_path / "Ratings.csv", sep=",", on_bad_lines="warn")
+    ratings.columns = map(to_snake_case, ratings.columns)
+    ratings = ratings.loc[ratings["book_rating"] > 0]
+    # ratings.to_csv(cfg.data_dir / "ratings.csv", index=False, na_rep="nan")
+
+    # merged = ratings.merge(books, how="inner", on="isbn")
+    # merged.to_csv(cfg.data_dir / "merged.csv", index=False, na_rep="nan")
+
+    return ratings, kaggle_path
+
+def preprocess(table_name: str, kaggle_path: str | None) -> tuple[pd.DataFrame, str]:
+    if table_name == "books":
+        return preprocess_books(kaggle_path)
+    
+    if table_name == "ratings":
+        return preprocess_ratings(kaggle_path)

@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import pandas as pd
 
 import src.models as models
 from src.utils import clean_text, download_from_kaggle, to_snake_case
-
+from src.config import Config
 
 class BookRecommender:
     """A simple collaborative filtering book recommender system.
@@ -25,17 +23,6 @@ class BookRecommender:
         data: Pandas DataFrame containing information about books and their ratings.
     """
 
-    KAGGLE_HANDLE = "arashnic/book-recommendation-dataset"
-    DATA_PATH = Path("data")
-    STRING_COLS = [
-        "book_title",
-        "book_author",
-        "publisher",
-        "book_title_lc",
-        "book_author_lc",
-        "publisher_lc",
-    ]
-    NON_LC_BOUND = 3
     MIN_N_RATINGS = 8
 
     def __init__(self):
@@ -43,13 +30,13 @@ class BookRecommender:
 
         Data are downloaded (if they are not already) and loaded here.
         """
-        if not (self.DATA_PATH / "merged.csv").exists():
+        if not (Config.data_dir / "merged.csv").exists():
             self.preprocess()
 
         self.data = pd.read_csv(
-            self.DATA_PATH / "merged.csv",
+            Config.data_dir / "merged.csv",
             na_values=["nan"],
-            dtype={c: "string" for c in self.STRING_COLS},
+            dtype={c: "string" for c in Config.string_cols},
         )
         self.book_titles = self.data.book_title.unique().tolist()
 
@@ -162,36 +149,4 @@ class BookRecommender:
             reverse=True,
         )
 
-    def preprocess(self):
-        """Downloads and preprocesses the book dataset from Kaggle.
-
-        1. Downloads the dataset if not already present.
-        2. Cleans text columns (trims, lowercases, removes noise).
-        3. Filters ratings > 0.
-        4. Merges books and ratings into a single CSV file (`merged.csv`).
-        """
-        kaggle_path = download_from_kaggle(self.KAGGLE_HANDLE)
-
-        books = pd.read_csv(
-            kaggle_path / "Books.csv", sep=",", on_bad_lines="warn", encoding="cp1251"
-        )
-        books.columns = map(to_snake_case, books.columns)
-        books["year_of_publication"] = (
-            pd.to_numeric(books["year_of_publication"], errors="coerce")
-            .astype("Int64")
-            .replace([0], pd.NA)
-        )
-        for c in self.STRING_COLS[: self.NON_LC_BOUND]:
-            books[c] = books / [c].astype("string").str.strip()
-            books[c] = books[c].map(clean_text)
-            books[f"{c}_lc"] = books[c].str.lower()
-
-        books.to_csv(self.DATA_PATH / "books.csv", index=False, na_rep="nan")
-
-        ratings = pd.read_csv(kaggle_path / "Ratings.csv", sep=",", on_bad_lines="warn")
-        ratings.columns = map(to_snake_case, ratings.columns)
-        ratings = ratings.loc[ratings["book_rating"] > 0]
-        ratings.to_csv(self.DATA_PATH / "ratings.csv", index=False, na_rep="nan")
-
-        merged = ratings.merge(books, how="inner", on="isbn")
-        merged.to_csv(self.DATA_PATH / "merged.csv", index=False, na_rep="nan")
+    
