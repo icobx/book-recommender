@@ -1,8 +1,9 @@
 import pandas as pd
 
-import src.models as models
-from src.utils import clean_text, download_from_kaggle, to_snake_case
-from src.config import Config
+import models as models
+from db_client import DatabaseClient
+
+from config import config, db_config
 
 class BookRecommender:
     """A simple collaborative filtering book recommender system.
@@ -23,22 +24,24 @@ class BookRecommender:
         data: Pandas DataFrame containing information about books and their ratings.
     """
 
-    MIN_N_RATINGS = 8
 
     def __init__(self):
         """Initialize BookRecommender class.
 
         Data are downloaded (if they are not already) and loaded here.
         """
-        if not (Config.data_dir / "merged.csv").exists():
-            self.preprocess()
+        self.db = DatabaseClient()
 
-        self.data = pd.read_csv(
-            Config.data_dir / "merged.csv",
-            na_values=["nan"],
-            dtype={c: "string" for c in Config.string_cols},
-        )
-        self.book_titles = self.data.book_title.unique().tolist()
+
+        # if not (Config.data_dir / "merged.csv").exists():
+        #     self.preprocess()
+
+        # self.data = pd.read_csv(
+        #     Config.data_dir / "merged.csv",
+        #     na_values=["nan"],
+        #     dtype={c: "string" for c in Config.string_cols},
+        # )
+        # self.book_titles = self.data.book_title.unique().tolist()
 
     def __call__(self, request: models.RecommendRequestBody) -> dict[str, any]:
         """Returns book recommendations based on a given book title.
@@ -63,6 +66,19 @@ class BookRecommender:
             ],
         }
 
+    def get_book_readers(self, book_title: str) -> list[str]:
+        records = (
+            self.db
+            .get_cursor().execute(db_config.book_readers_sql, (book_title,)).fetchall()
+        )
+
+        return [r[0] for r in records]
+    
+    def get_other_books_of_book_readers(self, book_readers: list[str]) -> pd.DataFrame:
+        query = db_config.other_books_of_book_readers_sql.replace("?", ", ".join(["?"] * len(book_readers)))
+
+        return pd.read_sql_query(query, self.db.conn, params=book_readers)
+
     def calcualte_correlations(self, book_title: str) -> list[dict[str, str | float]]:
         """Computes Pearson correlations between the given book and other books.
 
@@ -82,16 +98,18 @@ class BookRecommender:
             ValueError: If the book is not found in the dataset or
                 if there are not enough ratings to compute recommendations.
         """
-        book_readers = self.data.loc[
-            self.data.book_title_lc == (book_title_lc := book_title.lower()), "user_id"
-        ].unique()
+        # book_readers = self.data.loc[
+        #     self.data.book_title_lc == (book_title_lc := book_title.lower()), "user_id"
+        # ].unique()
+        book_readers = self.get_book_readers((book_title_lc := book_title.lower()))
 
         if len(book_readers) == 0:
             raise ValueError(f"Book {book_title} is not in the database.")
 
-        other_books_of_book_readers = self.data.loc[
-            self.data.user_id.isin(book_readers)
-        ]
+        # other_books_of_book_readers = self.data.loc[
+        #     self.data.user_id.isin(book_readers)
+        # ]
+        other_books_of_book_readers = self.get_other_books_of_book_readers(book_readers)
 
         n_ratings_per_book = (
             other_books_of_book_readers.groupby("book_title_lc")["user_id"]
@@ -101,7 +119,7 @@ class BookRecommender:
         )
 
         books_to_compare = n_ratings_per_book.loc[
-            n_ratings_per_book.n_ratings >= self.MIN_N_RATINGS, "book_title_lc"
+            n_ratings_per_book.n_ratings >= config.min_n_ratings, "book_title_lc"
         ]
 
         if books_to_compare.empty:
@@ -111,7 +129,7 @@ class BookRecommender:
 
         ratings_of_book_readers = other_books_of_book_readers.loc[
             other_books_of_book_readers.book_title_lc.isin(books_to_compare),
-            ["user_id", "book_rating", "book_title_lc", "book_title"],
+            ["user_id", "book_rating", "book_title_lc"],
         ]
 
         ratings_of_book_readers_nodup = (
@@ -137,7 +155,7 @@ class BookRecommender:
 
             correlations.append(
                 {
-                    "book_title": curr_book_subset.book_title.values[0],
+                    "book_title": bt,
                     "correlation_with_selected_book": correlation,
                     "average_rating": curr_book_subset.book_rating.mean(),
                 }
@@ -149,4 +167,7 @@ class BookRecommender:
             reverse=True,
         )
 
-    
+x = BookRecommender()
+
+y = x.calcualte_correlations('1984')
+print(y)

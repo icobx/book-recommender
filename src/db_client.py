@@ -130,8 +130,16 @@ class DatabaseClient(metaclass=Singleton):
         self.conn.commit()
     
 
+# from config import db_config
+# x = DatabaseClient()
+# y = x.get_cursor().execute(db_config.book_readers_sql, ('the hobbit',)).fetchall()
+# z = [k[0] for k in y]
+# print(z)
+# import pandas as pd
 
-x = DatabaseClient()
+# query = db_config.other_books_of_book_readers_sql.replace("?", ", ".join(["?"] * len(z)))
+# print(pd.read_sql_query(query, x.conn, params=z))
+
 # x.drop_table('books')
 # x.drop_table('ratings')
 # x.run_migrations()
