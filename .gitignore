@@ -1,4 +1,4 @@
 /data/*
 !/data/.gitkeep
 todo.txt
-__pycache__
+__pycache__database/*.db
