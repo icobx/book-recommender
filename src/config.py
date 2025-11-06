@@ -30,19 +30,17 @@ class DatabaseConfig:
 
     book_readers_sql: str = field(init=False)
     other_books_of_book_readers_sql: str = field(init=False)
+    books_by_titles: str = field(init=False)
 
     def __post_init__(self):
         object.__setattr__(self, "table_names_set", set(self.table_names))
-        object.__setattr__(
-            self,
-            "book_readers_sql",
-            (self.db_scripts / "s_book_readers.sql").read_text(encoding="utf-8")
-        )
-        object.__setattr__(
-            self,
-            "other_books_of_book_readers_sql",
-            (self.db_scripts / "s_other_books_of_book_readers.sql").read_text(encoding="utf-8")
-        )
+
+        for script_fn in ["s_book_readers", "s_other_books_of_book_readers", "s_books_by_titles"]:
+            object.__setattr__(
+                self,
+                f"{script_fn[2:]}_sql",
+                (self.db_scripts / f"{script_fn}.sql").read_text(encoding="utf-8")
+            )
 
 
 config: Config = Config()

@@ -1,9 +1,9 @@
 import pandas as pd
 
-import models as models
-from db_client import DatabaseClient
+import src.models as models
+from src.db_client import DatabaseClient
 
-from config import config, db_config
+from src.config import config, db_config
 
 class BookRecommender:
     """A simple collaborative filtering book recommender system.
@@ -56,13 +56,21 @@ class BookRecommender:
         corrs = self.calcualte_correlations(book_title=request.book_title)
         top_n = request.top_n if request.top_n > 0 else len(corrs)
 
-        corrs = corrs[:top_n]
+        corrs = corrs.head(top_n)
+
+        books = self.get_books_by_titles(corrs.book_title_lc.values.tolist())
+
+        recommended_books = (
+            books.merge(corrs, on='book_title_lc')
+            .drop(columns=['book_title_lc'])
+            .to_dict(orient='records')
+        )
 
         return {
             "book_title": request.book_title,
             "top_n": top_n,
             "recommended_books": [
-                models.RecommendResponseRecord(**r) for r in corrs[:top_n]
+                models.RecommendResponseRecord(**r) for r in recommended_books
             ],
         }
 
@@ -78,6 +86,11 @@ class BookRecommender:
         query = db_config.other_books_of_book_readers_sql.replace("?", ", ".join(["?"] * len(book_readers)))
 
         return pd.read_sql_query(query, self.db.conn, params=book_readers)
+    
+    def get_books_by_titles(self, titles: list[str]):
+        query = db_config.books_by_titles_sql.replace("?", ", ".join(["?"] * len(titles)))
+        
+        return pd.read_sql_query(query, self.db.conn, params=titles) #.to_json(orient='records')
 
     def calcualte_correlations(self, book_title: str) -> list[dict[str, str | float]]:
         """Computes Pearson correlations between the given book and other books.
@@ -155,19 +168,48 @@ class BookRecommender:
 
             correlations.append(
                 {
-                    "book_title": bt,
-                    "correlation_with_selected_book": correlation,
-                    "average_rating": curr_book_subset.book_rating.mean(),
+                    "book_title_lc": bt,
+                    "correlation_with_selected_book": round(correlation, 2),
+                    "average_rating": round(curr_book_subset.book_rating.mean(), 2),
                 }
             )
 
-        return sorted(
+        return pd.DataFrame(sorted(
             correlations,
             key=lambda x: x["correlation_with_selected_book"],
             reverse=True,
-        )
+        ))
 
-x = BookRecommender()
+# x = BookRecommender()
 
-y = x.calcualte_correlations('1984')
-print(y)
+# corrs = x.calcualte_correlations('1984')
+# # print(y)
+
+# # print(y[:10])
+# # print(y.head(10))
+# corrs = corrs.head(len(corrs))
+# # corrs.book_title_lc = corrs.book_title_lc.astype(str)
+# # print(corrs.dtypes)
+# books = x.get_books_by_titles(corrs.book_title_lc.values.tolist())
+# # print(books.dtypes)
+
+# # books.book_title_lc = books.book_title_lc.astype(str)
+# # print(corrs["book_title_lc"].map(type).value_counts())
+# # print(books["book_title_lc"].map(type).value_counts())
+
+
+# result = books.merge(corrs, on='book_title_lc')
+
+# print(result)
+
+# qq = [i['book_title'] for i in y]
+
+# # print(qq)
+# import sys
+# j, p = x.get_books_by_titles(qq)
+# # print(ff)
+
+# # print(j)
+# print(sys.getsizeof(j) / 1024)
+# print(sys.getsizeof(p) / 1024)
+# print(j == p)

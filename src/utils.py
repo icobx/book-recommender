@@ -6,7 +6,7 @@ import pandas as pd
 import ftfy
 import kagglehub
 
-from config import Config
+from src.config import Config
 
 
 cfg = Config()
