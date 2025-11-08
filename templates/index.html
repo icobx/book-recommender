@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Book Recommender</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2em;
+      }
+      input,
+      button {
+        padding: 0.5em;
+        margin-right: 0.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Book Recommender</h1>
+    <input type="number" id="top-n" value="5" min="1" />
+
+    <!-- <label for="book">Book title:</label> -->
+    <input list="book-options" id="book-title-input" name="book" />
+    <datalist id="book-options"></datalist>
+
+    <!-- <input type="text" id="bookTitle" placeholder="Enter a book title" /> -->
+    <button id="recommend-button">Recommend</button>
+
+    <h2>Results:</h2>
+    <ul id="results"></ul>
+    <table id="results2"></table>
+    <script type="module" src="/static/script.js"></script>
+  </body>
+</html>

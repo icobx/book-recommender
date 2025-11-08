@@ -2,14 +2,14 @@ import html
 import re
 from pathlib import Path
 
-import pandas as pd
 import ftfy
 import kagglehub
+import pandas as pd
 
 from src.config import Config
 
-
 cfg = Config()
+
 
 def to_snake_case(text: str) -> str:
     """Convert a string to snake_case.
@@ -75,11 +75,12 @@ def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]
     for c in cfg.string_cols[: cfg.non_lc_bound]:
         books[c] = books[c].astype("string").str.strip()
         books[c] = books[c].map(clean_text)
-    
+
     books["book_title_lc"] = books["book_title"].str.lower()
 
     return books, kaggle_path
     # books.to_csv(cfg.data_dir / "books.csv", index=False, na_rep="nan")
+
 
 def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
     if kaggle_path is None:
@@ -95,9 +96,10 @@ def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, st
 
     return ratings, kaggle_path
 
+
 def preprocess(table_name: str, kaggle_path: str | None) -> tuple[pd.DataFrame, str]:
     if table_name == "books":
         return preprocess_books(kaggle_path)
-    
+
     if table_name == "ratings":
         return preprocess_ratings(kaggle_path)

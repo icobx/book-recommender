@@ -1,7 +1,8 @@
 import traceback
 
-from fastapi import FastAPI, HTTPException, Request, Query, responses, staticfiles
+from fastapi import FastAPI, HTTPException, Query, Request, responses, staticfiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
 from rapidfuzz import process
 
 import src.models as models
@@ -43,9 +44,10 @@ app.add_middleware(
 )
 app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
 
+templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=responses.HTMLResponse)
-def home():
+def home(request: Request):
     """Returns the HTML homepage of the app.
 
     Loads and returns the static HTML content from `static/index.html`.
@@ -53,8 +55,9 @@ def home():
     Returns:
         HTML content of the homepage.
     """
-    with open("static/index.html") as handle:
-        return handle.read()
+    # with open("static/index.html") as handle:
+    #     return handle.read()
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post("/recommend", response_model=models.RecommendResponseBody)
@@ -78,7 +81,7 @@ async def recommend(
         HTTPException: If an error occurs during recommendation computation.
     """
     try:
-        return request.app.state.book_recommender(request_body)
+        return models.RecommendResponseBody(**request.app.state.book_recommender(request_body))
 
     except Exception as e:
         raise HTTPException(
@@ -86,16 +89,17 @@ async def recommend(
             detail={
                 "input": request_body.model_dump(),
                 "type": str(type(e)),
-                "traceback": traceback.format_exc()
+                "traceback": traceback.format_exc(),
             },
         )
 
-@app.get('/autocomplete', response_model=dict)
-def autocomplete(
+
+@app.get("/autocomplete", response_model=models.AutocompleteResponseBody)
+async def autocomplete(
     request: Request,
-    q: str = Query(..., min_length=3, description='Partial book title.'),
-    limit: int = Query(10, ge=1, le=50, description='Max number of suggestions.')
-) -> dict:
+    q: str = Query(..., min_length=3, description="Partial book title."),
+    limit: int = Query(10, ge=1, le=50, description="Max number of suggestions."),
+) -> models.AutocompleteResponseBody:
     """API endpoint to get book titles suggestions based on provided query.
 
     Args:
@@ -107,15 +111,8 @@ def autocomplete(
     Returns:
         Dictionary with list of suggestions under `suggestions` key.
     """
-    # matches = process.extract(
-    #     q,
-    #     request.app.state.book_recommender.book_titles,
-    #     limit=limit
-    # )
-
-    # return {"suggestions": [title for title, _, _ in matches]}
-
-    titles = request.app.state.book_recommender.data[['book_title', 'book_title_lc']]
-    matches = titles.loc[titles.book_title_lc.str.contains(q.lower()), 'book_title'].unique().tolist()
-
-    return {"suggestions": matches}
+    return models.AutocompleteResponseBody(
+        suggestions=request.app.state.book_recommender.get_book_titles_by_title(
+            q.lower()
+        )
+    )

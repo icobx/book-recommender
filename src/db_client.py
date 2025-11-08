@@ -1,7 +1,8 @@
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 from src.utils import preprocess
+
 
 class Singleton(type):
     """Singleton metaclass.
@@ -34,14 +35,11 @@ class DatabaseClient(metaclass=Singleton):
     Attributes:
         conn: Database connection object.
     """
+
     DB_DIR = Path("database")
     DB_PATH = DB_DIR / "books.db"
     DB_SCRIPTS = DB_DIR / "scripts"
-    TABLES_NAMES = [
-        "books",
-        "ratings",
-        "rated_books"
-    ]
+    TABLES_NAMES = ["books", "ratings", "rated_books"]
     TABLE_NAMES_SET = set(TABLES_NAMES)
 
     def __init__(self) -> None:
@@ -99,36 +97,36 @@ class DatabaseClient(metaclass=Singleton):
             raise ValueError(f"Arg `table_name` must be one of {self.TABLES_NAMES}")
 
     def init_tables(self):
-        for mf in sorted(self.DB_SCRIPTS.glob('m_*.sql')):
+        for mf in sorted(self.DB_SCRIPTS.glob("m_*.sql")):
             with open(mf, "r") as handle:
                 self.conn.executescript(handle.read())
                 self.conn.commit()
-    
+
     def populate_tables(self):
         for tn in self.TABLES_NAMES:
             if not self.is_empty(tn):
                 continue
 
             if tn == "rated_books":
-                with open(self.DB_SCRIPTS / "s_populate_rated_books.sql", "r") as handle:
-                    self.conn.executescript(handle.read()) 
+                with open(
+                    self.DB_SCRIPTS / "s_populate_rated_books.sql", "r"
+                ) as handle:
+                    self.conn.executescript(handle.read())
                     self.conn.commit()
-                
+
                 continue
 
             table, self.kaggle_path = preprocess(tn, self.kaggle_path)
 
             table.to_sql(tn, self.conn, if_exists="replace")
             self.conn.commit()
-        
-        
 
     def drop_table(self, table_name: str):
-        self.validate_table_name(table_name)    
+        self.validate_table_name(table_name)
 
         self.get_cursor().execute(f"DROP TABLE {table_name}")
         self.conn.commit()
-    
+
 
 # from config import db_config
 # x = DatabaseClient()

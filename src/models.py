@@ -45,14 +45,14 @@ class RecommendResponseRecord(pydantic.BaseModel):
         average_rating: Average user rating of the recommended book.
     """
 
+    image_url_s: str
     isbn: str
     book_title: str
     author: str
     publication_year: int
     publisher: str
-    image_url_s: str
-    correlation_with_selected_book: float
     average_rating: float
+    correlation_with_selected_book: float
 
 
 class RecommendResponseBody(pydantic.BaseModel):
@@ -67,3 +67,7 @@ class RecommendResponseBody(pydantic.BaseModel):
     book_title: str
     top_n: int
     recommended_books: te.List[RecommendResponseRecord]
+
+
+class AutocompleteResponseBody(pydantic.BaseModel):
+    suggestions: list[str]
