@@ -1,4 +1,22 @@
-import { REC_BOOKS_COL_MAPPING } from "./config.js";
+import { ERROR_MESSAGES, REC_BOOKS_COL_MAPPING } from "./config.js";
+
+const showError = (msg) => {
+  const box = document.getElementById("error-box");
+
+  box.textContent = msg;
+  box.style.visibility = msg ? "visible" : "hidden";
+};
+
+const handleError = (errorDetail) => {
+  const errorMeta = ERROR_MESSAGES[errorDetail.code];
+
+  if (errorMeta.showToUser) {
+    showError(errorMeta.msg);
+  } else {
+    showError("Something went wrong. Please contact support.");
+    // TODO: LOG THE ISSUE HERE
+  }
+};
 
 const createHTMLImage = (url, alt, w = 0, h = 0) => {
   const img = document.createElement("img");
@@ -14,7 +32,8 @@ const createHTMLImage = (url, alt, w = 0, h = 0) => {
 };
 
 const fetchSuggestions = async (query) => {
-  if (query.length < 4) return;
+  if (query.length === 0 || query.length % 3 !== 0) return;
+  //   if (query.length < 4) return;
 
   const dataList = document.getElementById("book-options");
 
@@ -51,15 +70,12 @@ const recommend = async () => {
   if (!response.ok) {
     const error = await response.json();
     console.error("Server error:", error);
-    alert(`Error: ${error.detail || "Unknown error"}`);
+    handleError(error.detail);
     return;
   }
   const data = await response.json();
-  console.log(data);
-  //   const resultsList = document.getElementById("results");
-  //   resultsList.innerHTML = "";
 
-  const table = document.getElementById("results2");
+  const table = document.getElementById("results");
   table.innerHTML = "";
   const thead = document.createElement("thead");
   table.appendChild(thead);
@@ -91,22 +107,13 @@ const recommend = async () => {
       tr.appendChild(td);
     });
   });
-
-  //   data.recommended_books.forEach((book) => {
-  //     const li = document.createElement("li");
-  //     li.textContent = `${
-  //       book.book_title
-  //     } (corr: ${book.correlation_with_selected_book.toFixed(2)}, rating: ${
-  //       book.average_rating
-  //     })`;
-  //     resultsList.appendChild(li);
-  //   });
 };
 
 window.addEventListener("DOMContentLoaded", () => {
-  document
-    .getElementById("book-title-input")
-    .addEventListener("input", (e) => fetchSuggestions(e.target.value));
+  document.getElementById("book-title-input").addEventListener("input", (e) => {
+    showError("");
+    fetchSuggestions(e.target.value);
+  });
 
   document
     .getElementById("recommend-button")

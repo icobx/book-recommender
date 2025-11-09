@@ -3,3 +3,5 @@
 todo.txt
 __pycache__
 database/*.db
+/logs/*
+!/logs/.gitkeep

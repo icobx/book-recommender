@@ -1,10 +1,11 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class Config:
     data_dir: Path = Path("data")
+    logs_dir: Path = Path("logs")
     kaggle_handle: str = "arashnic/book-recommendation-dataset"
     string_cols: list[str] = field(
         default_factory=lambda: [
@@ -16,11 +17,7 @@ class Config:
     )
     non_lc_bound: int = 3
     min_n_ratings: int = 8
-    ordered_output_cols: list[str] = field(
-        default_factory=lambda: [
-            "image_url_s", "isbn", "book_title", "author", "publication_year", "publisher", "average_rating", "correlation_with_selected_book"
-        ]
-    )
+    
 
 @dataclass(frozen=True)
 class DatabaseConfig:
@@ -50,6 +47,100 @@ class DatabaseConfig:
                 f"{script_fn[2:]}_sql",
                 (self.db_scripts / f"{script_fn}.sql").read_text(encoding="utf-8"),
             )
+
+
+@dataclass(frozen=True)
+class LoggingFormatterConfig:
+    format: str = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+
+
+@dataclass(frozen=True)
+class LoggingHandlerConfig:
+    class_: str
+    formatter: str
+    level: str
+    extra: dict[str, any] = field(default_factory=dict)
+
+    def to_dict(self):
+        data = {
+            "class": self.class_,
+            "formatter": self.formatter,
+            "level": self.level,
+            **self.extra,
+        }
+        return data
+    
+
+@dataclass(frozen=True)
+class LoggingLoggerConfig:
+    handlers: list[str]
+    level: str
+    propagate: bool
+
+@dataclass(frozen=True)
+class LoggingConfig:
+    version: int = 1
+    disable_existing_loggers: bool = False
+    formatters: dict[str, LoggingFormatterConfig] = field(
+        default_factory=lambda: {
+            "default": LoggingFormatterConfig(),
+        }
+    )
+    handlers: dict[str, LoggingHandlerConfig] = field(
+        default_factory=lambda: {
+            "console": LoggingHandlerConfig(
+                class_="logging.StreamHandler",
+                formatter="default",
+                level="INFO",
+                extra={"stream": "ext://sys.stdout"},
+            ),
+            "file": LoggingHandlerConfig(
+                class_="logging.handlers.RotatingFileHandler",
+                formatter="default",
+                level="INFO",
+                extra={
+                    "filename": "logs/app.log",
+                    "maxBytes": 10_485_760,
+                    "backupCount": 3,
+                },
+            ),
+        }
+    )
+    loggers: dict[str, LoggingLoggerConfig] = field(
+        default_factory=lambda: {
+            "uvicorn": LoggingLoggerConfig(
+                handlers=["console", "file"], level="INFO", propagate=False
+            ),
+            "uvicorn.error": LoggingLoggerConfig(
+                handlers=["console", "file"], level="INFO", propagate=False
+            ),
+            "uvicorn.access": LoggingLoggerConfig(
+                handlers=["console", "file"], level="INFO", propagate=False
+            ),
+        }
+    )
+    root: LoggingLoggerConfig = field(
+        default_factory=lambda: LoggingLoggerConfig(
+            handlers=["console", "file"], level="INFO", propagate=False
+        )
+    )
+
+    def to_dict(self) -> dict[str, any]:
+        """Convert dataclass to dict suitable for dictConfig()."""
+        return {
+            "version": self.version,
+            "disable_existing_loggers": self.disable_existing_loggers,
+            "formatters": {
+                name: asdict(fmt) for name, fmt in self.formatters.items()
+            },
+            "handlers": {
+                name: handler.to_dict() for name, handler in self.handlers.items()
+            },
+            "loggers": {
+                name: asdict(logger) for name, logger in self.loggers.items()
+            },
+            "root": asdict(self.root),
+        }
 
 
 config: Config = Config()

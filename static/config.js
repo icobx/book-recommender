@@ -8,3 +8,14 @@ export const REC_BOOKS_COL_MAPPING = Object.freeze({
   average_rating: "Average Rating",
   correlation_with_selected_book: "Recommendation Score",
 });
+
+export const ERROR_MESSAGES = Object.freeze({
+  BOOK_NOT_FOUND: {
+    msg: "The book you entered was not found in our database.",
+    showToUser: true,
+  },
+  NOT_ENOUGH_RATINGS: {
+    msg: "There are not enough ratings by relevant users to calculate Recommendation Score.",
+    showToUser: true,
+  },
+});

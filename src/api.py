@@ -1,14 +1,15 @@
-import traceback
-
+import logging
 from fastapi import FastAPI, HTTPException, Query, Request, responses, staticfiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
-from rapidfuzz import process
+from contextlib import asynccontextmanager
 
 import src.models as models
 from src.book_recommender import BookRecommender
+import src.utils as utils
 
 
+@asynccontextmanager
 async def book_recommender_init_lifespan(app: FastAPI):
     """FastAPI lifespan context manager for initializing the BookRecommender.
 
@@ -22,11 +23,12 @@ async def book_recommender_init_lifespan(app: FastAPI):
     Yields:
         None: Allows FastAPI to proceed with its startup lifecycle.
     """
+    utils.setup_logging()
     app.state.book_recommender = BookRecommender()
 
     yield
 
-    app.state.book_recommender.data = None
+    app.state.book_recommender.db.close_connection()
 
 
 app = FastAPI(
@@ -45,6 +47,8 @@ app.add_middleware(
 app.mount("/static", staticfiles.StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+logger = logging.getLogger(__name__)
 
 @app.get("/", response_class=responses.HTMLResponse)
 def home(request: Request):
@@ -80,22 +84,12 @@ async def recommend(
     Raises:
         HTTPException: If an error occurs during recommendation computation.
     """
-    try:
-        return models.RecommendResponseBody(**request.app.state.book_recommender(request_body))
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "input": request_body.model_dump(),
-                "type": str(type(e)),
-                "traceback": traceback.format_exc(),
-            },
-        )
+    logger.info("Responding to recommend request.")
+    return models.RecommendResponseBody(**request.app.state.book_recommender.recommend(request_body))
 
 
 @app.get("/autocomplete", response_model=models.AutocompleteResponseBody)
-async def autocomplete(
+async def autocomplete( 
     request: Request,
     q: str = Query(..., min_length=3, description="Partial book title."),
     limit: int = Query(10, ge=1, le=50, description="Max number of suggestions."),
@@ -111,6 +105,7 @@ async def autocomplete(
     Returns:
         Dictionary with list of suggestions under `suggestions` key.
     """
+    logger.info("Responding to autocomplete request.")
     return models.AutocompleteResponseBody(
         suggestions=request.app.state.book_recommender.get_book_titles_by_title(
             q.lower()

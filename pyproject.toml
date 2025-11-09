@@ -5,3 +5,12 @@ target-version = ["py311"]
 [tool.isort]
 profile = "black"
 line_length = 88
+
+[tool.uvicorn]
+factory = true
+host = "127.0.0.1"
+port = 8000
+reload = true
+workers = 1
+log_config = "logging_config.yaml"
+log_level = "info"

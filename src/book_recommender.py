@@ -1,8 +1,13 @@
+import logging
 import pandas as pd
+import starlette.status as status
 
 import src.models as models
 from src.config import config, db_config
 from src.db_client import DatabaseClient
+from src.exceptions import UserFacingException, ExcCode
+
+logger = logging.getLogger(__name__)
 
 
 class BookRecommender:
@@ -29,47 +34,9 @@ class BookRecommender:
 
         Data are downloaded (if they are not already) and loaded here.
         """
+        logger.info("Initializing DatabaseClient.")
         self.db = DatabaseClient()
 
-        # if not (config.data_dir / "merged.csv").exists():
-        #     self.preprocess()
-
-        # self.data = pd.read_csv(
-        #     config.data_dir / "merged.csv",
-        #     na_values=["nan"],
-        #     dtype={c: "string" for c in config.string_cols},
-        # )
-        # self.book_titles = self.data.book_title.unique().tolist()
-
-    def __call__(self, request: models.RecommendRequestBody) -> dict[str, any]:
-        """Returns book recommendations based on a given book title.
-
-        Args:
-            request: A request object with the target book title and number of top recommendations to return.
-
-        Returns:
-            A dictionary containing the original book title,
-            the number of recommendations returned, and a list of recommended books as `RecommendResponseRecord` objects.
-        """
-        corrs = self.calcualte_correlations(book_title=request.book_title)
-        top_n = request.top_n if request.top_n > 0 else len(corrs)
-        corrs = corrs.head(top_n)
-
-        books = self.get_books_by_titles(corrs.book_title_lc.values.tolist())
-
-        recommended_books = (
-            corrs.merge(books, on="book_title_lc")
-            .drop(columns=["book_title_lc"])#[config.ordered_output_cols]
-            .to_dict(orient="records")
-        )
-
-        return {
-            "book_title": request.book_title,
-            "top_n": top_n,
-            "recommended_books": [
-                models.RecommendResponseRecord(**r) for r in recommended_books
-            ],
-        }
 
     def get_book_titles_by_title(self, title: str) -> list[str]:
         records = (
@@ -124,7 +91,15 @@ class BookRecommender:
         """
         book_readers = self.get_book_readers((book_title_lc := book_title.lower()))
         if len(book_readers) == 0:
-            raise ValueError(f"Book {book_title} is not in the database.")
+            msg = f"Book {book_title} is not in the database."
+            logger.exception(msg)
+
+            raise UserFacingException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                exc_code=ExcCode.BOOK_NOT_FOUND,
+                message=msg,
+                input=book_title,
+            )
 
         other_books_of_book_readers = self.get_other_books_of_book_readers(book_readers)
 
@@ -139,8 +114,14 @@ class BookRecommender:
             n_ratings_per_book.n_ratings >= config.min_n_ratings, "book_title_lc"
         ]
         if len(books_to_compare) < 2:
-            raise ValueError(
-                "Not enough ratings by the relevant reviewers to continue."
+            msg = "Not enough ratings by the relevant reviewers to continue."
+            logger.exception(msg)
+
+            raise UserFacingException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                exc_code=ExcCode.NOT_ENOUGH_RATINGS,
+                message=msg,
+                input=book_title,
             )
 
         ratings_of_book_readers = other_books_of_book_readers.loc[
@@ -167,12 +148,11 @@ class BookRecommender:
 
             correlation = df_corr[book_title_lc].corr(df_corr[bt])
             if pd.isna(correlation):
-                # TODO: change this to proper logs
-                print(f'WARN: correlation for book {bt} is NaN. Skipping...')
+                logger.debug("Correlation for book %s is NaN. Skipping.", bt)
                 continue
 
             if correlation < 0:
-                print(f'WARN: negative correlation for book {bt}. Skipping...')
+                logger.debug("Negative correlation for book %s. Skipping.", bt)
                 continue
 
             curr_book_subset = ratings_of_book_readers.loc[
@@ -187,7 +167,6 @@ class BookRecommender:
                 }
             )
 
-
         return pd.DataFrame(
             sorted(
                 correlations,
@@ -196,37 +175,35 @@ class BookRecommender:
             )
         )
 
+    def recommend(self, request: models.RecommendRequestBody) -> dict[str, any]:
+        """Returns book recommendations based on a given book title.
 
-# x = BookRecommender()
+        Args:
+            request: A request object with the target book title and number of top recommendations to return.
 
-# corrs = x.calcualte_correlations('1984')
-# # print(y)
+        Returns:
+            A dictionary containing the original book title,
+            the number of recommendations returned, and a list of recommended books as `RecommendResponseRecord` objects.
+        """
+        logger.info("Calculating correlations.")
+        corrs = self.calcualte_correlations(book_title=request.book_title)
+        top_n = request.top_n if request.top_n > 0 else len(corrs)
+        corrs = corrs.head(top_n)
 
-# # print(y[:10])
-# # print(y.head(10))
-# corrs = corrs.head(len(corrs))
-# # corrs.book_title_lc = corrs.book_title_lc.astype(str)
-# # print(corrs.dtypes)
-# books = x.get_books_by_titles(corrs.book_title_lc.values.tolist())
-# # print(books.dtypes)
+        logger.info("Getting books by titles.")
+        books = self.get_books_by_titles(corrs.book_title_lc.values.tolist())
 
-# # books.book_title_lc = books.book_title_lc.astype(str)
-# # print(corrs["book_title_lc"].map(type).value_counts())
-# # print(books["book_title_lc"].map(type).value_counts())
+        logger.info("Merging correlations with books.")
+        recommended_books = (
+            corrs.merge(books, on="book_title_lc")
+            .drop(columns=["book_title_lc"])#[config.ordered_output_cols]
+            .to_dict(orient="records")
+        )
 
-
-# result = books.merge(corrs, on='book_title_lc')
-
-# print(result)
-
-# qq = [i['book_title'] for i in y]
-
-# # print(qq)
-# import sys
-# j, p = x.get_books_by_titles(qq)
-# # print(ff)
-
-# # print(j)
-# print(sys.getsizeof(j) / 1024)
-# print(sys.getsizeof(p) / 1024)
-# print(j == p)
+        return {
+            "book_title": request.book_title,
+            "top_n": top_n,
+            "recommended_books": [
+                models.RecommendResponseRecord(**r) for r in recommended_books
+            ],
+        }

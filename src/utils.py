@@ -1,3 +1,4 @@
+import logging
 import html
 import re
 from pathlib import Path
@@ -6,9 +7,8 @@ import ftfy
 import kagglehub
 import pandas as pd
 
-from src.config import Config
+from src.config import config, LoggingConfig
 
-cfg = Config()
 
 
 def to_snake_case(text: str) -> str:
@@ -61,7 +61,7 @@ def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]
     4. Merges books and ratings into a single CSV file (`merged.csv`).
     """
     if kaggle_path is None:
-        kaggle_path = download_from_kaggle(cfg.kaggle_handle)
+        kaggle_path = download_from_kaggle(config.kaggle_handle)
 
     books = pd.read_csv(
         kaggle_path / "Books.csv", sep=",", on_bad_lines="warn", encoding="cp1251"
@@ -72,27 +72,22 @@ def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]
         .astype("Int64")
         .replace([0], pd.NA)
     )
-    for c in cfg.string_cols[: cfg.non_lc_bound]:
+    for c in config.string_cols[: config.non_lc_bound]:
         books[c] = books[c].astype("string").str.strip()
         books[c] = books[c].map(clean_text)
 
     books["book_title_lc"] = books["book_title"].str.lower()
 
     return books, kaggle_path
-    # books.to_csv(cfg.data_dir / "books.csv", index=False, na_rep="nan")
 
 
 def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
     if kaggle_path is None:
-        kaggle_path = download_from_kaggle(cfg.kaggle_handle)
+        kaggle_path = download_from_kaggle(config.kaggle_handle)
 
     ratings = pd.read_csv(kaggle_path / "Ratings.csv", sep=",", on_bad_lines="warn")
     ratings.columns = map(to_snake_case, ratings.columns)
     ratings = ratings.loc[ratings["book_rating"] > 0]
-    # ratings.to_csv(cfg.data_dir / "ratings.csv", index=False, na_rep="nan")
-
-    # merged = ratings.merge(books, how="inner", on="isbn")
-    # merged.to_csv(cfg.data_dir / "merged.csv", index=False, na_rep="nan")
 
     return ratings, kaggle_path
 
@@ -103,3 +98,12 @@ def preprocess(table_name: str, kaggle_path: str | None) -> tuple[pd.DataFrame, 
 
     if table_name == "ratings":
         return preprocess_ratings(kaggle_path)
+
+
+def setup_logging():
+    """Apply the logging configuration."""
+    log_config = LoggingConfig().to_dict()
+
+    config.logs_dir.mkdir(exist_ok=True)
+
+    logging.config.dictConfig(log_config)
