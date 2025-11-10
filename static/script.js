@@ -1,5 +1,9 @@
 import { ERROR_MESSAGES, REC_BOOKS_COL_MAPPING } from "./config.js";
 
+/**
+ * Displays an error message in the error box.
+ * @param {string} msg - The message to display. Hides the box if empty.
+ */
 const showError = (msg) => {
   const box = document.getElementById("error-box");
 
@@ -7,17 +11,24 @@ const showError = (msg) => {
   box.style.visibility = msg ? "visible" : "hidden";
 };
 
+/**
+ * Handles error details returned from the backend and shows appropriate user message.
+ * @param {{ code: string }} errorDetail - Object containing error code from backend.
+ */
 const handleError = (errorDetail) => {
   const errorMeta = ERROR_MESSAGES[errorDetail.code];
 
-  if (errorMeta.showToUser) {
-    showError(errorMeta.msg);
-  } else {
-    showError("Something went wrong. Please contact support.");
-    // TODO: LOG THE ISSUE HERE
-  }
+  showError(errorMeta.msg);
 };
 
+/**
+ * Creates an HTML <img> element with optional dimensions.
+ * @param {string} url - The image source URL.
+ * @param {string} alt - The alt text for accessibility.
+ * @param {number} [w=0] - Optional width in pixels.
+ * @param {number} [h=0] - Optional height in pixels.
+ * @returns {HTMLImageElement} - The constructed <img> element.
+ */
 const createHTMLImage = (url, alt, w = 0, h = 0) => {
   const img = document.createElement("img");
   img.src = url;
@@ -31,9 +42,37 @@ const createHTMLImage = (url, alt, w = 0, h = 0) => {
   return img;
 };
 
+/**
+ * Constructs and populates the table body with recommended books data.
+ * @param {{ recommended_books: Object[] }} data - The backend response containing book data.
+ */
+const constructTable = (data) => {
+  const tbody = document.getElementById("results");
+  tbody.innerHTML = "";
+
+  data.recommended_books.forEach((book) => {
+    const tr = document.createElement("tr");
+    tbody.appendChild(tr);
+
+    Object.entries(book).forEach(([k, v]) => {
+      const td = document.createElement("td");
+      if (k.includes("image_url")) {
+        td.appendChild(createHTMLImage(v, "Book Cover", 60, 90));
+      } else {
+        td.textContent = v;
+      }
+
+      tr.appendChild(td);
+    });
+  });
+};
+
+/**
+ * Fetches autocomplete suggestions based on partial query and populates datalist.
+ * @param {string} query - The partial book title input by the user.
+ */
 const fetchSuggestions = async (query) => {
   if (query.length === 0 || query.length % 3 !== 0) return;
-  //   if (query.length < 4) return;
 
   const dataList = document.getElementById("book-options");
 
@@ -54,6 +93,9 @@ const fetchSuggestions = async (query) => {
   }
 };
 
+/**
+ * Sends recommendation request to the backend and displays results in the table.
+ */
 const recommend = async () => {
   const bookTitle = document.getElementById("book-title-input").value;
   const topN = document.getElementById("top-n").value;
@@ -69,46 +111,17 @@ const recommend = async () => {
 
   if (!response.ok) {
     const error = await response.json();
-    console.error("Server error:", error);
     handleError(error.detail);
     return;
   }
   const data = await response.json();
 
-  const table = document.getElementById("results");
-  table.innerHTML = "";
-  const thead = document.createElement("thead");
-  table.appendChild(thead);
-
-  const headerRow = document.createElement("tr");
-  thead.appendChild(headerRow);
-  //   data.recommended_books[0].keys()
-  Object.keys(data.recommended_books[0]).forEach((k) => {
-    const th = document.createElement("th");
-    th.textContent = REC_BOOKS_COL_MAPPING[k];
-    headerRow.appendChild(th);
-  });
-
-  const tbody = document.createElement("tbody");
-  table.appendChild(tbody);
-
-  data.recommended_books.forEach((book) => {
-    const tr = document.createElement("tr");
-    tbody.appendChild(tr);
-
-    Object.entries(book).forEach(([k, v]) => {
-      const td = document.createElement("td");
-      if (k.includes("image_url")) {
-        td.appendChild(createHTMLImage(v, "Book Cover", 60, 90));
-      } else {
-        td.textContent = v;
-      }
-
-      tr.appendChild(td);
-    });
-  });
+  constructTable(data);
 };
 
+/**
+ * Initializes event listeners after DOM is fully loaded.
+ */
 window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("book-title-input").addEventListener("input", (e) => {
     showError("");

@@ -1,44 +1,46 @@
 import logging
+
 import pandas as pd
 import starlette.status as status
 
 import src.models as models
 from src.config import config, db_config
 from src.db_client import DatabaseClient
-from src.exceptions import UserFacingException, ExcCode
+from src.exceptions import ExcCode, UserFacingException
 
 logger = logging.getLogger(__name__)
 
 
 class BookRecommender:
-    """A simple collaborative filtering book recommender system.
+    """A simple filtering book recommender system.
 
-    Downloads and preprocesses data from a Kaggle dataset (if needed),
-    loads it into memory, and computes recommendations based on user
-    rating correlations.
+    Downloads and preprocesses data from a Kaggle dataset (if not yet available),
+    loads it into a local SQLite database, and computes book recommendations
+    based on user rating correlations.
 
-    Logic is based on original book_rec.py (currently book_rec_original.py).
+    Logic is based on original book_rec.py (currently src/legacy/book_rec_original.py).
 
     Attributes:
-        KAGGLE_HANDLE: String identifier of Kaggle dataset.
-        DATA_PATH: Path to the `data` directory.
-        STRING_COLS: List of columns of type string.
-        NON_LC_BOUND: Index separating non-lowercased and lowercased columns in `STRING_COLS` attribute.
-        MIN_N_RATINGS: Minimal number of ratings required for system to be able to recommend books.
-
-        data: Pandas DataFrame containing information about books and their ratings.
+        db: Instance of `DatabaseClient` providing access to SQLite database.
     """
 
     def __init__(self):
         """Initialize BookRecommender class.
 
-        Data are downloaded (if they are not already) and loaded here.
+        Creates an instance of `DatabaseClient`.
         """
         logger.info("Initializing DatabaseClient.")
         self.db = DatabaseClient()
 
-
     def get_book_titles_by_title(self, title: str) -> list[str]:
+        """Retrieve book titles from the database that partially match a given title.
+
+        Args:
+            title: Full or partial book title to search for.
+
+        Returns:
+            A list of book titles matching the given query (case-insensitive).
+        """
         records = (
             self.db.get_cursor()
             .execute(db_config.book_titles_by_title_sql, (title.lower(),))
@@ -48,6 +50,14 @@ class BookRecommender:
         return [r[0] for r in records]
 
     def get_book_readers(self, title: str) -> list[str]:
+        """Retrieve IDs of users who rated the specified book.
+
+        Args:
+            title: The lowercase title of the book.
+
+        Returns:
+            A list of user IDs who rated the given book.
+        """
         records = (
             self.db.get_cursor()
             .execute(db_config.book_readers_sql, (title,))
@@ -57,6 +67,14 @@ class BookRecommender:
         return [r[0] for r in records]
 
     def get_books_by_titles(self, titles: list[str]) -> pd.DataFrame:
+        """Retrieve book records for a list of book titles.
+
+        Args:
+            titles: List of book titles to retrieve records for.
+
+        Returns:
+            A pandas DataFrame containing records for the given books.
+        """
         query = db_config.books_by_titles_sql.replace(
             "?", ", ".join(["?"] * len(titles))
         )
@@ -64,14 +82,22 @@ class BookRecommender:
         return pd.read_sql_query(query, self.db.conn, params=titles)
 
     def get_other_books_of_book_readers(self, book_readers: list[str]) -> pd.DataFrame:
+        """Retrieve all books rated by a list of users.
+
+        Args:
+            book_readers: List of user IDs who rated the selected book.
+
+        Returns:
+            A pandas DataFrame containing all ratings given by these users.
+        """
         query = db_config.other_books_of_book_readers_sql.replace(
             "?", ", ".join(["?"] * len(book_readers))
         )
 
         return pd.read_sql_query(query, self.db.conn, params=book_readers)
 
-    def calcualte_correlations(self, book_title: str) -> list[dict[str, str | float]]:
-        """Computes Pearson correlations between the given book and other books.
+    def calcualte_correlations(self, book_title: str) -> pd.DataFrame:
+        """Compute correlations between the given book and other books.
 
         Filters out books with too few ratings and computes correlations
         only between the selected book and books rated by the same users.
@@ -80,14 +106,11 @@ class BookRecommender:
             book_title: Title of the book to base recommendations on.
 
         Returns:
-            A list of dictionaries, each containing:
-                - 'book_title': Title of a recommended book,
-                - 'correlation_with_selected_book': Pearson correlation value,
-                - 'average_rating': Average rating by shared users.
+            Pandas DataFrame containing book titles, average ratings and recommendation scores.
 
         Raises:
-            ValueError: If the book is not found in the dataset or
-                if there are not enough ratings to compute recommendations.
+            UserFacingException: If the book is not found in the database or if
+                there are insufficient ratings to compute recommendations.
         """
         book_readers = self.get_book_readers((book_title_lc := book_title.lower()))
         if len(book_readers) == 0:
@@ -176,14 +199,21 @@ class BookRecommender:
         )
 
     def recommend(self, request: models.RecommendRequestBody) -> dict[str, any]:
-        """Returns book recommendations based on a given book title.
+        """Generate book recommendations for a given book.
+
+        Retrieve books rated by similar readers and ranks them
+        by correlation strength and average rating.
 
         Args:
-            request: A request object with the target book title and number of top recommendations to return.
+            request: Pydantic model containing the target book title (`book_title`)
+                and desired number of recommendations (`top_n`).
 
         Returns:
-            A dictionary containing the original book title,
-            the number of recommendations returned, and a list of recommended books as `RecommendResponseRecord` objects.
+            A dictionary with the following keys:
+                - 'book_title': The original book title from the request.
+                - 'top_n': The number of recommendations returned.
+                - 'recommended_books': A list of `RecommendResponseRecord` objects
+                    representing recommended books and their metadata.
         """
         logger.info("Calculating correlations.")
         corrs = self.calcualte_correlations(book_title=request.book_title)
@@ -196,7 +226,7 @@ class BookRecommender:
         logger.info("Merging correlations with books.")
         recommended_books = (
             corrs.merge(books, on="book_title_lc")
-            .drop(columns=["book_title_lc"])#[config.ordered_output_cols]
+            .drop(columns=["book_title_lc"])
             .to_dict(orient="records")
         )
 

@@ -2,10 +2,11 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from src.utils import preprocess
 from src.config import db_config
+from src.utils import preprocess
 
 logger = logging.getLogger(__name__)
+
 
 class Singleton(type):
     """Singleton metaclass.
@@ -32,7 +33,7 @@ class Singleton(type):
 
 
 class DatabaseClient(metaclass=Singleton):
-    """DatabaseClient singleton class provides an interface for connecting to and
+    """DatabaseClient (singleton) class provides an interface for connecting to and
     managing local database.
 
     Attributes:
@@ -40,7 +41,10 @@ class DatabaseClient(metaclass=Singleton):
     """
 
     def __init__(self) -> None:
-        """Initialize DatabaseClient class."""
+        """Initialize DatabaseClient class.
+
+        Open connection. Run init scripts and populate tables if not yet populated.
+        """
         self.kaggle_path = None
 
         self.open_connection()
@@ -92,12 +96,25 @@ class DatabaseClient(metaclass=Singleton):
         )
 
     def validate_table_name(self, table_name: str):
+        """Validate whether a given table name is recognized.
+
+        Args:
+            table_name: The name of the table to validate.
+
+        Raises:
+            ValueError: If `table_name` is not among expected names.
+        """
         if table_name not in db_config.table_names_set:
             msg = f"Arg `table_name` must be one of {db_config.table_names}"
             logger.exception(msg)
             raise ValueError(msg)
 
     def run_init_scripts(self):
+        """Run initialization SQL scripts for database setup.
+
+        Executes all SQL files in the `db_scripts` directory that match
+        the pattern `m_*.sql`. Scripts are run in sorted order.
+        """
         logger.info("Running DB init scripts.")
         for mf in sorted(db_config.db_scripts.glob("m_*.sql")):
             with open(mf, "r") as handle:
@@ -106,6 +123,13 @@ class DatabaseClient(metaclass=Singleton):
                 self.conn.commit()
 
     def populate_tables(self):
+        """Populate the database tables with data.
+
+        For each table defined in the config:
+        - If it is already populated, skip it.
+        - If it is `rated_books`, populate it using a pre-written SQL script.
+        - Otherwise, preprocess raw data and insert it into the database.
+        """
         logger.info("Populating DB tables.")
         for tn in db_config.table_names:
             if not self.is_empty(tn):
@@ -122,7 +146,6 @@ class DatabaseClient(metaclass=Singleton):
 
                 continue
 
-
             logger.info("Preprocessing data for table %s.", tn)
             table, self.kaggle_path = preprocess(tn, self.kaggle_path)
 
@@ -131,25 +154,15 @@ class DatabaseClient(metaclass=Singleton):
             self.conn.commit()
 
     def drop_table(self, table_name: str):
+        """Drop a table from the database.
+
+        Args:
+            table_name: The name of the table to be dropped.
+
+        Raises:
+            ValueError: If `table_name` is invalid.
+        """
         self.validate_table_name(table_name)
 
         self.get_cursor().execute(f"DROP TABLE {table_name}")
         self.conn.commit()
-
-
-# from config import db_config
-# x = DatabaseClient()
-# y = x.get_cursor().execute(db_config.book_readers_sql, ('the hobbit',)).fetchall()
-# z = [k[0] for k in y]
-# print(z)
-# import pandas as pd
-
-# query = db_config.other_books_of_book_readers_sql.replace("?", ", ".join(["?"] * len(z)))
-# print(pd.read_sql_query(query, x.conn, params=z))
-
-# x.drop_table('books')
-# x.drop_table('ratings')
-# x.run_migrations()
-
-# for tn in x.TABLES_NAMES:
-#     x.drop_table(tn)

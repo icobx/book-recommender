@@ -1,0 +1,100 @@
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2rem;
+}
+
+h1,
+h2 {
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 3rem;
+}
+
+.input-group {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.label-input-pair {
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+}
+
+.label-input-pair input {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.button-wrapper {
+  padding: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.button-wrapper button {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.spacer {
+  height: 2rem;
+}
+
+table {
+  border-collapse: collapse;
+  margin-top: 1rem;
+  width: 90%;
+  max-width: 800px;
+}
+
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+th {
+  background-color: #f4f4f4;
+}
+
+/* .wide {
+  width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+} */
+#results-table th:nth-child(3),
+#results-table td:nth-child(3) {
+  width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#error-box {
+  visibility: hidden;
+  color: red;
+  padding-top: 15px;
+  height: 1.5rem;
+}
+
+#no-results-row {
+  column-span: 8;
+  text-align: center;
+  font-style: italic;
+}

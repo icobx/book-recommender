@@ -3,35 +3,51 @@
   <head>
     <meta charset="utf-8" />
     <title>📚 Book Recommender</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        margin: 2em;
-      }
-      input,
-      button {
-        padding: 0.5em;
-        margin-right: 0.5em;
-      }
-    </style>
+    <link rel="stylesheet" href="/static/styles/styles.css" />
   </head>
   <body>
     <h1>📚 Book Recommender</h1>
-    <input type="number" id="top-n" value="5" min="1" />
+    <div class="input-group">
+      <div class="label-input-pair">
+        <label for="n-results">Number of Recommendations</label>
+        <input type="number" id="top-n" value="5" min="1" name="n-results" />
+      </div>
 
-    <!-- <label for="book">Book title:</label> -->
-    <input list="book-options" id="book-title-input" name="book" />
-    <datalist id="book-options"></datalist>
+      <div class="label-input-pair">
+        <label for="book">Book Title</label>
+        <input
+          list="book-options"
+          id="book-title-input"
+          name="book"
+          placeholder="Enter a book title"
+        />
+        <datalist id="book-options"></datalist>
+      </div>
 
-    <!-- <input type="text" id="bookTitle" placeholder="Enter a book title" /> -->
-    <button id="recommend-button">Recommend</button>
-
-    <div
-      id="error-box"
-      style="visibility: hidden; color: red; padding-top: 15px; height: 1.5em"
-    ></div>
+      <button class="button-wrapper" id="recommend-button">Recommend</button>
+    </div>
+    <div id="error-box"></div>
+    <div class="spacer"></div>
     <h2>Recommendations</h2>
-    <table id="results"></table>
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th>Cover</th>
+          <th>ISBN</th>
+          <th class="wide">Title</th>
+          <th>Author</th>
+          <th>Published</th>
+          <th>Publisher</th>
+          <th>Average Rating</th>
+          <th>Recommendation Score</th>
+        </tr>
+      </thead>
+      <tbody id="results">
+        <tr>
+          <td id="no-results-row" colspan="8">No results yet</td>
+        </tr>
+      </tbody>
+    </table>
     <script type="module" src="/static/script.js"></script>
   </body>
 </html>

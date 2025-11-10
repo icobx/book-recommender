@@ -1,14 +1,14 @@
-import logging
 import html
+import logging
 import re
 from pathlib import Path
+from typing import Literal
 
 import ftfy
 import kagglehub
 import pandas as pd
 
-from src.config import config, LoggingConfig
-
+from src.config import LoggingConfig, config
 
 
 def to_snake_case(text: str) -> str:
@@ -53,12 +53,16 @@ def download_from_kaggle(handle: str) -> Path:
 
 
 def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
-    """Downloads and preprocesses the book dataset from Kaggle.
+    """Load and preprocess the Books dataset from the Kaggle directory.
 
-    1. Downloads the dataset if not already present.
-    2. Cleans text columns (trims, lowercases, removes noise).
-    3. Filters ratings > 0.
-    4. Merges books and ratings into a single CSV file (`merged.csv`).
+    If the path is not provided, downloads the dataset using the Kaggle handle.
+    Performs column renaming, text cleaning, and normalization of publication years.
+
+    Args:
+        kaggle_path: Optional path to the local Kaggle dataset directory.
+
+    Returns:
+        A tuple containing the preprocessed books DataFrame and the dataset path used.
     """
     if kaggle_path is None:
         kaggle_path = download_from_kaggle(config.kaggle_handle)
@@ -82,6 +86,17 @@ def preprocess_books(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]
 
 
 def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, str]:
+    """Load and preprocess the Ratings dataset from the Kaggle directory.
+
+    If the path is not provided, downloads the dataset using the Kaggle handle.
+    Performs column renaming and filters out zero ratings.
+
+    Args:
+        kaggle_path: Optional path to the local Kaggle dataset directory.
+
+    Returns:
+        A tuple containing the preprocessed ratings DataFrame and the dataset path used.
+    """
     if kaggle_path is None:
         kaggle_path = download_from_kaggle(config.kaggle_handle)
 
@@ -92,7 +107,20 @@ def preprocess_ratings(kaggle_path: str | None = None) -> tuple[pd.DataFrame, st
     return ratings, kaggle_path
 
 
-def preprocess(table_name: str, kaggle_path: str | None) -> tuple[pd.DataFrame, str]:
+def preprocess(
+    table_name: Literal["books", "ratings"], kaggle_path: str | None
+) -> tuple[pd.DataFrame, str]:
+    """Dispatch preprocessing based on table name.
+
+    Calls the appropriate preprocessing function for 'books' or 'ratings'.
+
+    Args:
+        table_name: Name of the table to preprocess. Must be either "books" or "ratings".
+        kaggle_path: Optional path to the local Kaggle dataset directory.
+
+    Returns:
+        A tuple containing the preprocessed DataFrame and the dataset path used.
+    """
     if table_name == "books":
         return preprocess_books(kaggle_path)
 
@@ -101,7 +129,11 @@ def preprocess(table_name: str, kaggle_path: str | None) -> tuple[pd.DataFrame, 
 
 
 def setup_logging():
-    """Apply the logging configuration."""
+    """Apply the logging configuration.
+
+    Creates the logs directory if it does not exist and sets up the logging configuration
+    defined in LoggingConfig.
+    """
     log_config = LoggingConfig().to_dict()
 
     config.logs_dir.mkdir(exist_ok=True)

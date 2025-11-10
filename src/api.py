@@ -1,12 +1,13 @@
 import logging
-from fastapi import FastAPI, HTTPException, Query, Request, responses, staticfiles
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI, Query, Request, responses, staticfiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+
 import src.models as models
-from src.book_recommender import BookRecommender
 import src.utils as utils
+from src.book_recommender import BookRecommender
 
 
 @asynccontextmanager
@@ -14,8 +15,8 @@ async def book_recommender_init_lifespan(app: FastAPI):
     """FastAPI lifespan context manager for initializing the BookRecommender.
 
     This function sets up the `BookRecommender` instance and attaches it
-    to the application's state during startup. On shutdown, it clears the
-    in-memory dataset.
+    to the application's state during startup. On shutdown, it closes connection
+    to the database.
 
     Args:
         app: The FastAPI application instance.
@@ -50,6 +51,7 @@ templates = Jinja2Templates(directory="templates")
 
 logger = logging.getLogger(__name__)
 
+
 @app.get("/", response_class=responses.HTMLResponse)
 def home(request: Request):
     """Returns the HTML homepage of the app.
@@ -59,8 +61,6 @@ def home(request: Request):
     Returns:
         HTML content of the homepage.
     """
-    # with open("static/index.html") as handle:
-    #     return handle.read()
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -85,25 +85,24 @@ async def recommend(
         HTTPException: If an error occurs during recommendation computation.
     """
     logger.info("Responding to recommend request.")
-    return models.RecommendResponseBody(**request.app.state.book_recommender.recommend(request_body))
+    return models.RecommendResponseBody(
+        **request.app.state.book_recommender.recommend(request_body)
+    )
 
 
 @app.get("/autocomplete", response_model=models.AutocompleteResponseBody)
-async def autocomplete( 
+async def autocomplete(
     request: Request,
     q: str = Query(..., min_length=3, description="Partial book title."),
-    limit: int = Query(10, ge=1, le=50, description="Max number of suggestions."),
 ) -> models.AutocompleteResponseBody:
     """API endpoint to get book titles suggestions based on provided query.
 
     Args:
         request: FastAPI request object, used to access app state.
         q: Query for suggestions. Defaults to Query(..., min_length=3, description='Partial book title.').
-        limit: Number of returned suggestions.
-            Defaults to Query(10, ge=1, le=50, description='Max number of suggestions.').
 
     Returns:
-        Dictionary with list of suggestions under `suggestions` key.
+        AutocompleteResponseBody object with list of suggestions under `suggestions` key.
     """
     logger.info("Responding to autocomplete request.")
     return models.AutocompleteResponseBody(

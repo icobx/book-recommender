@@ -14,11 +14,21 @@ class RecommendRequestBody(pydantic.BaseModel):
     top_n: int
 
     @pydantic.field_validator("book_title", mode="before")
-    def force_cast_str(book_title) -> str:
+    def force_cast_str(book_title: any) -> str:
+        """Force cast provided book_title to string.
+
+        Will fail if provided book_title is not able to be cast to string.
+
+        Args:
+            book_title: Book title to be cast to string.
+
+        Returns:
+            Book title as string.
+        """
         return str(book_title)
 
     @pydantic.field_validator("top_n", mode="after")
-    def check_non_neg_top_n(top_n) -> int:
+    def check_non_neg_top_n(top_n: int) -> int:
         """Validate that `top_n` is non-negative.
 
         Args:
@@ -70,4 +80,10 @@ class RecommendResponseBody(pydantic.BaseModel):
 
 
 class AutocompleteResponseBody(pydantic.BaseModel):
+    """Autocomplete schema.
+
+    Attributes:
+        suggestions: List of book titles as suggestions.
+    """
+
     suggestions: list[str]
