@@ -72,12 +72,6 @@ th {
   background-color: #f4f4f4;
 }
 
-/* .wide {
-  width: 250px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-} */
 #results-table th:nth-child(3),
 #results-table td:nth-child(3) {
   width: 200px;

@@ -71,7 +71,7 @@ const constructTable = (data) => {
  * Fetches autocomplete suggestions based on partial query and populates datalist.
  * @param {string} query - The partial book title input by the user.
  */
-const fetchSuggestions = async (query) => {
+const fetchTitleSuggestions = async (query) => {
   if (query.length === 0 || query.length % 3 !== 0) return;
 
   const dataList = document.getElementById("book-options");
@@ -96,7 +96,7 @@ const fetchSuggestions = async (query) => {
 /**
  * Sends recommendation request to the backend and displays results in the table.
  */
-const recommend = async () => {
+const getRecommendations = async () => {
   const bookTitle = document.getElementById("book-title-input").value;
   const topN = document.getElementById("top-n").value;
 
@@ -125,10 +125,10 @@ const recommend = async () => {
 window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("book-title-input").addEventListener("input", (e) => {
     showError("");
-    fetchSuggestions(e.target.value);
+    fetchTitleSuggestions(e.target.value);
   });
 
   document
     .getElementById("recommend-button")
-    .addEventListener("click", recommend);
+    .addEventListener("click", getRecommendations);
 });
